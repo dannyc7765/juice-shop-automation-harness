@@ -6,13 +6,23 @@ setup('authenticate via API and save storage state', async ({ request, page, bas
   const targetBaseURL = baseURL || process.env.BASE_URL || 'http://localhost:3000';
 
   const response = await request.post(`${targetBaseURL}/rest/user/login`, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
     data: {
       email: 'admin@juice-sh.op',
       password: 'admin123',
     },
   });
 
-  expect(response.ok()).toBeTruthy();
+  if (!response.ok()) {
+    const errorText = await response.text();
+    console.error(`\n[AUTH ERROR] Target: ${targetBaseURL}/rest/user/login`);
+    console.error(`[AUTH ERROR] Status: ${response.status()} ${response.statusText()}`);
+    console.error(`[AUTH ERROR] Response: ${errorText}\n`);
+  }
+
+  expect(response.ok(), `API Login failed with status ${response.status()}`).toBeTruthy();
   const body = await response.json();
   const token = body.authentication.token;
   const bid = String(body.authentication.bid);
