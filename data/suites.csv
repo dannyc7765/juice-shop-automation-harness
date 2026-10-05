@@ -1,5 +1,3 @@
 "DESCRIPTION","DURATION IN MS","NAME","PARENT SUITE","START TIME","STATUS","STOP TIME","SUB SUITE","SUITE","TEST CLASS","TEST METHOD"
-"","855","verify authenticated access state","chromium","2026-10-05","passed","2026-10-05","","tests/smoke.spec.ts","",""
-"","8235","Complete purchase with network assertions and artificial latency quarantine validation","chromium","2026-10-05","passed","2026-10-05","Transactional Business Operations","tests/e2e/checkout.spec.ts","",""
-"","1143","authenticate via API and save storage state","setup","2026-10-05","passed","2026-10-05","","src/utils/auth.setup.ts","",""
-"","1395","search and add item to cart with bypassed auth","chromium","2026-10-05","passed","2026-10-05","Catalog & Cart Flow","tests/catalog.spec.ts","",""
+"","849","authenticate via API and save storage state","setup","2026-10-05","passed","2026-10-05","","src/utils/auth.setup.ts","",""
+"","853","verify authenticated access state","chromium","2026-10-05","passed","2026-10-05","","tests/smoke.spec.ts","",""
