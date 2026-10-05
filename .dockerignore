@@ -1,0 +1,7 @@
+node_modules
+.auth
+test-results
+allure-results
+flaky-tests.json
+.git
+.github

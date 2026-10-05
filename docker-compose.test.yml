@@ -1,0 +1,37 @@
+services:
+  juice-shop:
+    image: bkimminich/juice-shop:latest
+    container_name: juice-shop
+    networks:
+      - test-net
+    expose:
+      - "3000"
+
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: test-runner
+    networks:
+      - test-net
+    environment:
+      - BASE_URL=http://juice-shop:3000
+      - CI=true
+    volumes:
+      - ./allure-results:/app/allure-results
+      - ./test-results:/app/test-results
+      - ./flaky-tests.json:/app/flaky-tests.json
+      - ./.auth:/app/.auth
+    depends_on:
+      - juice-shop
+    command: >
+      sh -c "node -e '
+        const check = () => fetch(\"http://juice-shop:3000/rest/admin/application-version\")
+          .then(r => { if (!r.ok) throw new Error(); process.exit(0); })
+          .catch(() => setTimeout(check, 1000));
+        check();
+      ' && npx playwright test"
+
+networks:
+  test-net:
+    driver: bridge
