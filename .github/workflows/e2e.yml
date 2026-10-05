@@ -118,14 +118,26 @@ jobs:
           ref: gh-pages
           path: gh-pages-branch
 
-      - name: Restore Allure History
+      - name: Restore Allure History & Inject Telemetry
         run: |
+          # 1. Restore previous trend history if available
           if [ -d "gh-pages-branch/history" ]; then
             cp -r gh-pages-branch/history consolidated-allure-results/
           fi
+          
+          # 2. Inject Categories mapping
           if [ -f "categories.json" ]; then
             cp categories.json consolidated-allure-results/categories.json
           fi
+
+          # 3. Inject Environment Information into Allure Report
+          cat <<EOF > consolidated-allure-results/environment.properties
+          Framework=Playwright 1.63.0
+          Node.js=v24
+          Target.Application=OWASP Juice Shop
+          Execution.Matrix=2 Shards
+          Quarantine.Policy=Automated Retry SLA Isolation
+          EOF
 
       - name: Generate Consolidated HTML Report
         run: allure generate consolidated-allure-results --clean -o allure-report

@@ -1,12 +1,12 @@
 [
   {
-    "name": "Quarantined Flaky Defects",
+    "name": "Quarantined Flaky Tests",
     "matchedStatuses": ["passed", "failed", "broken"],
     "flaky": true
   },
   {
-    "name": "SLA & Performance Violations",
-    "matchedStatuses": ["failed", "broken", "passed"],
-    "messageRegex": ".*(SLA|latency|timeout|quarantine).*"
+    "name": "Infrastructure & SLA Timeouts",
+    "matchedStatuses": ["failed", "broken"],
+    "messageRegex": ".*(timeout|SLA|latency).*"
   }
 ]
