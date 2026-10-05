@@ -110,6 +110,23 @@ jobs:
           path: consolidated-allure-results
           merge-multiple: true
 
+      - name: Checkout gh-pages for History Preservation
+        uses: actions/checkout@v4
+        if: always()
+        continue-on-error: true
+        with:
+          ref: gh-pages
+          path: gh-pages-branch
+
+      - name: Restore Allure History
+        run: |
+          if [ -d "gh-pages-branch/history" ]; then
+            cp -r gh-pages-branch/history consolidated-allure-results/
+          fi
+          if [ -f "categories.json" ]; then
+            cp categories.json consolidated-allure-results/categories.json
+          fi
+
       - name: Generate Consolidated HTML Report
         run: allure generate consolidated-allure-results --clean -o allure-report
 

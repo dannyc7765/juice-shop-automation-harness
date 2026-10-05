@@ -1,0 +1,7 @@
+[
+  {
+    "name": "Quarantined Flaky Defects",
+    "matchedStatuses": ["passed", "failed"],
+    "messageRegex": ".*(Artificial SLA violation|FLAKY_QUARANTINE|quarantine).*"
+  }
+]
