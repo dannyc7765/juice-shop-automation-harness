@@ -6,10 +6,17 @@ export default defineConfig({
   workers: 1,
   retries: 1,
   reporter: [
-    ['list'],
-    ['./src/reporters/QuarantineReporter.ts', { outputFile: 'flaky-tests.json' }],
-    ['allure-playwright', { outputFolder: 'allure-results' }],
+  ['list'],
+  ['./src/reporters/QuarantineReporter.ts'],
+  [
+    'allure-playwright',
+    {
+      detail: true,
+      outputFolder: 'allure-results',
+      suiteTitle: true,
+    },
   ],
+],
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:3000',
     trace: 'on-first-retry',

@@ -1,7 +1,12 @@
 [
   {
     "name": "Quarantined Flaky Defects",
-    "matchedStatuses": ["passed", "failed"],
-    "messageRegex": ".*(Artificial SLA violation|FLAKY_QUARANTINE|quarantine).*"
+    "matchedStatuses": ["passed", "failed", "broken"],
+    "flaky": true
+  },
+  {
+    "name": "SLA & Performance Violations",
+    "matchedStatuses": ["failed", "broken", "passed"],
+    "messageRegex": ".*(SLA|latency|timeout|quarantine).*"
   }
 ]
