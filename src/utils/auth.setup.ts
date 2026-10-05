@@ -3,7 +3,6 @@ import { test as setup, expect } from '@playwright/test';
 const authFile = '.auth/user.json';
 
 setup('authenticate via API and save storage state', async ({ request, page }) => {
-  // 1. Send login credentials straight to the server
   const response = await request.post('http://localhost:3000/rest/user/login', {
     data: {
       email: 'admin@juice-sh.op',
@@ -16,7 +15,6 @@ setup('authenticate via API and save storage state', async ({ request, page }) =
   const token = body.authentication.token;
   const bid = String(body.authentication.bid);
 
-  // 2. Set the cookie on localhost
   await page.context().addCookies([
     {
       name: 'token',
@@ -27,16 +25,37 @@ setup('authenticate via API and save storage state', async ({ request, page }) =
       secure: false,
       sameSite: 'Lax',
     },
+    {
+      name: 'welcomebanner_status',
+      value: 'dismiss',
+      domain: 'localhost',
+      path: '/',
+      httpOnly: false,
+      secure: false,
+      sameSite: 'Lax',
+    },
+    {
+      name: 'cookieconsent_status',
+      value: 'dismiss',
+      domain: 'localhost',
+      path: '/',
+      httpOnly: false,
+      secure: false,
+      sameSite: 'Lax',
+    },
   ]);
 
-  // 3. Open the site once to attach localStorage variables to the origin
   await page.goto('http://localhost:3000/#/');
-  await page.evaluate(({ jwt, basketId }) => {
-    localStorage.setItem('token', jwt);
-    localStorage.setItem('bid', basketId);
-    sessionStorage.setItem('bid', basketId);
-  }, { jwt: token, basketId: bid });
+  await page.evaluate(
+    ({ jwt, basketId }) => {
+      localStorage.setItem('token', jwt);
+      localStorage.setItem('bid', basketId);
+      sessionStorage.setItem('bid', basketId);
+      localStorage.setItem('welcomebanner_status', 'dismiss');
+      localStorage.setItem('cookieconsent_status', 'dismiss');
+    },
+    { jwt: token, basketId: bid }
+  );
 
-  // 4. Save this snapshot to .auth/user.json so future tests reuse it
   await page.context().storageState({ path: authFile });
 });

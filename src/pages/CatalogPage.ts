@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { BasePage } from './BasePage.js';
 
 export class CatalogPage extends BasePage {
@@ -14,58 +14,80 @@ export class CatalogPage extends BasePage {
   }
 
   async goto(): Promise<void> {
-    await this.navigate('/#/search');
-    await this.cleanOverlays();
+    await this.navigate('/#/');
+    await this.dismissModals();
   }
 
-  private async cleanOverlays(): Promise<void> {
-    // Force close any dialog or backdrop if Angular still managed to render it
-    const dismissDialog = this.page.locator('button[aria-label="Close Welcome Banner"], mat-dialog-container button:has-text("Dismiss")');
-    if (await dismissDialog.isVisible({ timeout: 1500 }).catch(() => false)) {
-      await dismissDialog.click();
+  async dismissModals(): Promise<void> {
+    const welcomeDismiss = this.page.locator('button[aria-label="Close Welcome Banner"]');
+    if (await welcomeDismiss.isVisible({ timeout: 1500 }).catch(() => false)) {
+      await welcomeDismiss.click({ force: true });
     }
 
-    // Force remove any leftover CDK overlay backdrop via the DOM
-    await this.page.evaluate(() => {
-      const backdrops = document.querySelectorAll('.cdk-overlay-backdrop');
-      backdrops.forEach((b) => b.remove());
-    });
+    const cookieDismiss = this.page.locator('a[aria-label="dismiss cookie message"]');
+    if (await cookieDismiss.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await cookieDismiss.click({ force: true });
+    }
+
+    const backdrop = this.page.locator('.cdk-overlay-backdrop');
+    if (await backdrop.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await this.page.keyboard.press('Escape');
+    }
   }
 
   async searchProduct(name: string): Promise<void> {
+    await this.dismissModals();
+    await this.searchButton.waitFor({ state: 'visible' });
     await this.searchButton.click();
+
     const input = this.page.locator('#searchQuery input');
     await input.waitFor({ state: 'visible', timeout: 5000 });
     await input.fill(name);
     await input.press('Enter');
-    await this.waitForNetworkIdle();
+    await this.page.waitForLoadState('domcontentloaded');
+  }
+
+  async directSearch(query: string): Promise<void> {
+    await Promise.all([
+      this.page.waitForResponse(
+        (resp) => resp.url().includes('/rest/products/search') && resp.status() === 200,
+        { timeout: 10000 }
+      ),
+      this.page.goto(`/#/search?q=${encodeURIComponent(query)}`),
+    ]);
+    await this.dismissModals();
+    await this.page.waitForLoadState('domcontentloaded');
   }
 
   async addToCart(productName: string): Promise<void> {
-    await this.cleanOverlays();
+    await this.dismissModals();
 
     const card = this.productCards.filter({ hasText: productName }).first();
-    await card.waitFor({ state: 'visible', timeout: 5000 });
+    await expect(card).toBeVisible({ timeout: 7000 });
 
-    const addButton = card.locator('button[aria-label*="Add to Basket"], button:has-text("Add to Basket")');
+    const addButton = card.locator('button[aria-label*="Add to Basket"]');
+    await expect(addButton).toBeVisible({ timeout: 5000 });
+    await expect(addButton).toBeEnabled({ timeout: 5000 });
+
     await addButton.scrollIntoViewIfNeeded();
 
-    // Listen for the basket update response concurrently with the click
-    const [response] = await Promise.all([
+    // Synchronize click with API completion so cart badge updates deterministically
+    await Promise.all([
       this.page.waitForResponse(
-        (resp) => resp.url().includes('/api/BasketItems') && resp.status() < 400,
+        (resp) => resp.url().toLowerCase().includes('/api/basketitems') && resp.status() < 400,
         { timeout: 10000 }
       ),
-      addButton.dispatchEvent('click'),
+      addButton.click({ force: true }),
     ]);
+  }
 
-    if (!response.ok()) {
-      throw new Error(`Basket API failed with status ${response.status()}`);
-    }
+  async clickAddToBasket(productName: string): Promise<void> {
+    await this.addToCart(productName);
   }
 
   async getCartCount(): Promise<number> {
-    await this.cartBadge.waitFor({ state: 'visible', timeout: 7000 });
+    await expect(this.cartBadge).toBeVisible({ timeout: 7000 });
+    await expect(this.cartBadge).not.toHaveText('0', { timeout: 5000 });
     const countText = await this.cartBadge.textContent();
     return parseInt(countText?.trim() || '0', 10);
   }
