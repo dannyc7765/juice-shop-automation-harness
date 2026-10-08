@@ -1,6 +1,6 @@
 # OWASP Juice Shop E2E Test Automation Harness
 
-![E2E Regression](https://github.com/dannyc7765/project-1-e2e/actions/workflows/e2e.yml/badge.svg?branch=main)
+[![E2E Regression & Telemetry](https://github.com/dannyc7765/juice-shop-automation-harness/actions/workflows/e2e.yml/badge.svg?branch=main)](https://github.com/dannyc7765/juice-shop-automation-harness/actions/workflows/e2e.yml)
 [![Allure Report](https://img.shields.io/badge/Allure_Report-View_Live-brightgreen)](https://dannyc7765.github.io/juice-shop-automation-harness/)
 
 Production-grade Playwright orchestration suite featuring API token injection, overlay bypass automation, sharded parallel CI execution, and quarantined telemetry collection.
