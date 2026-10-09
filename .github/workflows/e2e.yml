@@ -40,9 +40,8 @@ jobs:
         shardTotal: [2]
     services:
       juice-shop:
-        # TODO: pin to a specific tag once you know which version the suite passes against
-        # (e.g. bkimminich/juice-shop:v<major>.<minor>.<patch>). "latest" makes runs non-reproducible.
-        image: bkimminich/juice-shop:latest
+        # Pinned to the version the suite was validated against. Bump deliberately, not implicitly.
+        image: bkimminich/juice-shop:v20.2.0
         ports:
           - 3000:3000
 

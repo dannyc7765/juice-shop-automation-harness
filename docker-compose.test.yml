@@ -1,6 +1,6 @@
 services:
   juice-shop:
-    image: ${JUICE_SHOP_IMAGE:-bkimminich/juice-shop:latest}
+    image: ${JUICE_SHOP_IMAGE:-bkimminich/juice-shop:v20.2.0}
     container_name: juice-shop
     networks:
       - test-net

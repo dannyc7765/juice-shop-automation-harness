@@ -64,4 +64,4 @@ npm run typecheck && npm run lint && npm run format:check
 ## Known limitations
 
 - Single browser (Chromium).
-- Targets `bkimminich/juice-shop:latest`; pin a tag in CI and compose for fully reproducible runs.
+- Validated against Juice Shop v20.2.0 (pinned in CI and compose). Newer versions may need locator updates.
