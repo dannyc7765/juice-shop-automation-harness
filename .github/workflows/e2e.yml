@@ -7,16 +7,30 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
 
 concurrency:
   group: e2e-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  static-checks:
+    name: Lint & typecheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+
   test-sharded:
+    needs: static-checks
     timeout-minutes: 20
     runs-on: ubuntu-24.04
     strategy:
@@ -26,121 +40,105 @@ jobs:
         shardTotal: [2]
     services:
       juice-shop:
-        image: bkimminich/juice-shop:latest
+        # Pinned to the version the suite was validated against. Bump deliberately, not implicitly.
+        image: bkimminich/juice-shop:v20.2.0
         ports:
           - 3000:3000
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: 'npm'
+          cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
 
-      - name: Install Playwright Browsers
+      - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Await Juice Shop Readiness
-        run: |
-          node -e '
-            const check = () => fetch("http://localhost:3000/rest/admin/application-version")
-              .then(res => {
-                if (!res.ok) throw new Error("HTTP " + res.status);
-                console.log("Juice Shop ready on port 3000.");
-                process.exit(0);
-              })
-              .catch(() => {
-                console.log("Waiting for service...");
-                setTimeout(check, 1000);
-              });
-            check();
-          '
+      - name: Wait for Juice Shop
+        run: node scripts/wait-for-app.mjs http://localhost:3000/rest/admin/application-version 120
 
-      - name: Execute Tests (Shard ${{ matrix.shardIndex }}/${{ matrix.shardTotal }})
+      - name: Run tests (shard ${{ matrix.shardIndex }}/${{ matrix.shardTotal }})
         env:
           BASE_URL: http://localhost:3000
-          CI: true
         run: npx playwright test --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
 
-      - name: Upload Shard Test Artifacts
+      - name: Summarise flaky tests
+        if: ${{ !cancelled() }}
+        run: |
+          if [ -f reports/flaky-tests.json ]; then
+            echo "### Flaky tests (shard ${{ matrix.shardIndex }})" >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat reports/flaky-tests.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload traces, videos and flaky report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: test-results-shard-${{ matrix.shardIndex }}
           path: |
             test-results/
-            flaky-tests.json
+            reports/
+          if-no-files-found: ignore
           retention-days: 7
 
-      - name: Upload Raw Allure Results
+      - name: Upload raw Allure results
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: allure-results-shard-${{ matrix.shardIndex }}
           path: allure-results/
+          if-no-files-found: ignore
           retention-days: 7
 
   generate-report:
-    name: Consolidate & Deploy Allure
+    name: Consolidate & deploy Allure
     needs: test-sharded
-    if: ${{ always() }}
+    if: ${{ always() && needs.test-sharded.result != 'skipped' }}
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write # needed only to push the gh-pages branch
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 24
 
-      - name: Install Allure CLI
-        run: npm install -g allure-commandline
+      - run: npm install -g allure-commandline
 
-      - name: Download all raw Allure results
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           pattern: allure-results-shard-*
           path: consolidated-allure-results
           merge-multiple: true
 
-      - name: Checkout gh-pages for History Preservation
+      - name: Checkout gh-pages for history
         uses: actions/checkout@v4
-        if: always()
         continue-on-error: true
         with:
           ref: gh-pages
           path: gh-pages-branch
 
-      - name: Restore Allure History & Inject Telemetry
+      - name: Add history, categories and environment info
         run: |
-          # 1. Restore previous trend history if available
-          if [ -d "gh-pages-branch/history" ]; then
+          if [ -d gh-pages-branch/history ]; then
             cp -r gh-pages-branch/history consolidated-allure-results/
           fi
-          
-          # 2. Inject Categories mapping
-          if [ -f "categories.json" ]; then
-            cp categories.json consolidated-allure-results/categories.json
-          fi
+          cp categories.json consolidated-allure-results/categories.json
+          {
+            echo "Framework=Playwright $(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version" 2>/dev/null || echo unknown)"
+            echo "Node.js=$(node --version)"
+            echo "Target.Application=OWASP Juice Shop"
+            echo "Shards=2"
+          } > consolidated-allure-results/environment.properties
 
-          # 3. Inject Environment Information into Allure Report
-          cat <<EOF > consolidated-allure-results/environment.properties
-          Framework=Playwright 1.63.0
-          Node.js=v24
-          Target.Application=OWASP Juice Shop
-          Execution.Matrix=2 Shards
-          Quarantine.Policy=Automated Retry SLA Isolation
-          EOF
-
-      - name: Generate Consolidated HTML Report
-        run: allure generate consolidated-allure-results --clean -o allure-report
+      - run: allure generate consolidated-allure-results --clean -o allure-report
 
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main'
