@@ -1,16 +1,67 @@
-# OWASP Juice Shop E2E Test Automation Harness
+# OWASP Juice Shop Test Automation Harness
 
 [![E2E Regression & Telemetry](https://github.com/dannyc7765/juice-shop-automation-harness/actions/workflows/e2e.yml/badge.svg?branch=main)](https://github.com/dannyc7765/juice-shop-automation-harness/actions/workflows/e2e.yml)
 [![Allure Report](https://img.shields.io/badge/Allure_Report-View_Live-brightgreen)](https://dannyc7765.github.io/juice-shop-automation-harness/)
 
-Production-grade Playwright orchestration suite featuring API token injection, overlay bypass automation, sharded parallel CI execution, and quarantined telemetry collection.
-### 🛡️ Engineering Post-Mortems & Incident Log
-Detailed root-cause autopsies documenting distributed CI race conditions, overlay deadlocks, and container networking triage are tracked in [`INCIDENTS.md`](./INCIDENTS.md).
-## Execution Runbooks
+Playwright + TypeScript UI and API tests for [OWASP Juice Shop](https://github.com/juice-shop/juice-shop), run in GitHub Actions with sharding, Allure reporting and a flaky-test report.
 
-### 1. Local Headless Execution
-Run the full regression suite headless (requires Node 24+ and installed browsers):
+## What is covered
+
+| Area                  | Type | What it checks                                                                                                                      |
+| --------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Auth                  | API  | register, login, wrong password (401), duplicate email, mismatched passwords, auth-required endpoints                               |
+| Products              | API  | catalog integrity, data-driven search, empty search                                                                                 |
+| Basket                | API  | empty on creation, add item, requires token                                                                                         |
+| Security              | API  | SQLi login bypass and basket IDOR, asserted as secure behaviour and marked `test.fail()` because Juice Shop is vulnerable by design |
+| Login, search, basket | UI   | login success and failure, search, add to basket                                                                                    |
+| Checkout              | UI   | full purchase: address, delivery, card, order confirmation                                                                          |
+
+## Design decisions
+
+- **Every test gets its own user**, created through the API (`src/fixtures.ts`). No shared state, so tests are safe to run in parallel and need no conditional setup.
+- **Page objects** in `src/pages`, API setup in `src/api/ApiClient.ts`.
+- **Lint rules enforce the lessons in [INCIDENTS.md](INCIDENTS.md)**: no `force: true`, no `waitForTimeout`, no conditionals inside tests.
+- **Retries are CI-only** (1). Anything that fails and then passes is written to `reports/flaky-tests.json` and the CI job summary. It is reported, not hidden.
+- **Allure history** is preserved on the `gh-pages` branch to show trends across runs.
+
+## Run it
+
+Requires Node 24+.
+
+### Locally
+
+Start Juice Shop (`docker run -d -p 3000:3000 bkimminich/juice-shop`), then:
+
 ```bash
 npm ci
 npx playwright install --with-deps chromium
-npx playwright test
+npm test            # everything
+npm run test:api    # API only
+npm run test:ui     # UI only
+```
+
+### In Docker (Juice Shop + tests on an isolated network)
+
+```bash
+docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
+```
+
+### Quality checks
+
+```bash
+npm run typecheck && npm run lint && npm run format:check
+```
+
+## CI
+
+`.github/workflows/e2e.yml`: lint and typecheck, then tests in 2 shards against a Juice Shop service container, then the Allure report is merged and published to GitHub Pages from `main`.
+
+## Troubleshooting (Windows + Docker Desktop)
+
+- `bind: Only one usage of each socket address` on port 3000: another process holds it. Find it with `netstat -ano | findstr :3000` and stop it with `taskkill /PID <PID> /F`.
+- `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine`: Docker Desktop isn't running. Start it and wait until `docker info` succeeds.
+
+## Known limitations
+
+- Single browser (Chromium).
+- Targets `bkimminich/juice-shop:latest`; pin a tag in CI and compose for fully reproducible runs.

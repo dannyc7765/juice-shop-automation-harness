@@ -1,180 +1,137 @@
-# Engineering Post-Mortems & Incident Log (`INCIDENTS.md`)
+# Engineering Notes: Test Failures and Fixes
+
+Real failures hit while building this harness: what broke, why, and what the code does now.
+Each entry points at the code that contains the fix.
 
 ---
 
-## [INC-001] Docker Daemon Host Socket Collision on TCP Port 3000
+## INC-001: Strict mode violation on a composite search locator
 
-* *+Status:** Resolved
-* **Severity:** Blocker (Infrastructure / Local Container Runtime)
-* **Impacted Scope:** Local container provisioning (`bkimminich/juice-shop`)
+**Affected:** `CatalogPage.search()`
 
-### 1. Incident Symptom
-Docker daemon failed to bind port 3000:
-` listen tcp 0.0.0.0:3000: bind: Only one usage of each socket address is normally permitted. `
+**Symptom**
 
-### 2. Root-Cause Autopsy
-An orphaned host Node.js process retained an active listening socket on port 3000, blocking the Docker daemon's network allocation.
-
-### 3. Remediation
-Extracted the PID via host socket inspection and killed the process:
-```powershell
-netstat -ano | findstr :3000
-taskkill /PID <PID> /F
-docker run -d --name target-juice-shop -p 3000:3000 bkimminich/juice-shop
-```(Note: replace <PID> with the actual numeric process ID).
-
-
-### 4. SDET Architectural Defense
-Containerization isolates compute, but shares the host network interface. In CI/CD, ephemeral service containers and dynamic port bindings prevent port-locking flakiness.
-
----
-
-## [INC-002] Playwright Strict Mode Collision on Composite Search Locators
-* **Status:** Resolved
-* **Severity:** Medium (Locator Strategy Fragility)
-* **Impacted Scope:** `CatalogPage.searchProduct()`
-
-### 1. Incident Symptom
-`Error: locator.click: Error: strict mode violation: getByRole('button', { name: /search/i }).or(locator('#searchQuery')) resolved to 3 elements`
-
-### 2. Root-Cause Autopsy
-Playwright requires action locators to resolve to exactly one DOM element. The composite regex matched the container, the open button, and the clear button simultaneously.
-
-### 3. Remediation
-Refactored to an unambiguous, role-based accessibility locator:
-```typescript
-this.searchButton = this.getByRole('button', { name: 'Open search' });
+```
+Error: locator.click: strict mode violation:
+getByRole('button', { name: /search/i }).or(locator('#searchQuery')) resolved to 3 elements
 ```
 
-### 4. SDET Architectural Defense
-Loose regex chains yield selector drift. Enterprise automation prioritizes accessibility trees (`aria-label`, accessible names) to survive DOM restructuring.
+**Root cause**
+Playwright actions require a locator that resolves to exactly one element. The loose regex plus `.or()` matched the search container, the "open" button and the "clear" button.
+
+**Fix**
+Use a single role-based locator with an exact accessible name (`src/pages/CatalogPage.ts`):
+
+```ts
+this.openSearchButton = page.getByRole('button', { name: 'Open search' });
+```
+
+**Lesson**
+Broad regexes and `.or()` chains hide ambiguity until the DOM changes. Prefer role + exact name.
 
 ---
 
-## [INC-003] Pointer Event Interception by Angular Material CDK Overlay Backdrop
-* **Status:** Resolved
-* **Severity:**High (Asynchronous DOM Race Condition)
-* **Impacted Scope:** `CatalogPage.addToCart()`
+## INC-002: Angular Material overlay backdrop intercepting clicks
 
-### 1. Incident Symptom
-Playwright timed out after 30,000ms attempting to click "Add to Basket":
-`<div class="cdk-overlay-backdrop cdk-overlay-dark-backdrop cdk-overlay-backdrop-showing"></div> from <div class="cdk-overlay-container">…</div> subtree intercepts pointer events`
+**Affected:** adding a product to the basket
 
-### 2. Root-Cause Autopsy
-Owasp Juice Shop dynamically evaluates configuration background calls on routing. Angular mounted the Welcome Banner modal asynchronously while the test was already typing, putting a dark sheet in front of the button.
+**Symptom**
+Click timed out after 30s:
 
-### 3. Remediation
-Suppressed modal creation at the browser context level via cookies and storage init scripts:
-```typescript
+```
+<div class="cdk-overlay-backdrop cdk-overlay-dark-backdrop cdk-overlay-backdrop-showing"></div>
+... intercepts pointer events
+```
+
+**Root cause**
+Juice Shop loads its config asynchronously and opens the Welcome Banner modal after the page is already interactive. The test started interacting, then the modal's backdrop covered the button.
+
+**Fix**
+Prevent the modal from ever opening by setting the dismissal cookies on the browser context before any navigation (`suppressOverlays` auto-fixture in `src/fixtures.ts`):
+
+```ts
 await context.addCookies([
-  { name: 'cookieconsent_status', value: 'dismiss', domain: 'localhost', path: '/' },
-  { name: 'welcomebanner_status', value: 'dismiss', domain: 'localhost', path: '/' },
+  { name: 'welcomebanner_status', value: 'dismiss', domain, path: '/' },
+  { name: 'cookieconsent_status', value: 'dismiss', domain, path: '/' },
 ]);
-
-await context.addInitScript(() => {
-  window.localStorage.setItem('welcomebanner_status', 'dismiss');
-  window.sessionStorage.setItem('bid', '1');
-});
 ```
 
-### 4. SDET Architectural Defense
-Adding arsenals of `waitForTimeout` masks race conditions. Senior SDETs disable third-party modals overlarge at the browser context bootstrap level.
+An earlier version also used `click({ force: true })` and `waitForTimeout`. Both were removed; `force: true` bypasses the very check that surfaced this bug, and ESLint (`playwright/no-force-option`) now blocks it.
+
+**Lesson**
+Remove the cause of the race instead of working around it in every test.
 
 ---
 
-## [INC-004] Client Session Deserialization Drop & Async Response Listener Deadlock
-* **Status:** Resolved
-* **Severity:** Critical (State Persistence & Asynchronous Deadlock)
-* **Impacted Scope:** `CatalogPage.addToCart()` and cart badge assertions
+## INC-003: Basket add silently did nothing (`sessionStorage` not persisted)
 
-### 1. Incident Symptom
-The UI click fired, but the cart count badge remained 0:
-`Expected: >= 1, Received: 0`.Network trace showed zero calls to `/api/BasketItems`. An attempted `waitForResponse` listener timed out after 7,000ms.
+**Affected:** `CatalogPage.addToBasket()`, basket assertions
 
-### 2. Root-Cause Autopsy
-1. Playwright's `storageState` does not serialize `sessionStorage`. Juice Shop's Angular client maps basket additions using `sessionStorage.getItem('bid')`. Without it, it dropped the cart action silently.
-2. Sequential awaits (`await click()`, followed by `await waitForResponse()`) deadlocked when the click hang on DOM overlays.
+**Symptom**
+The click happened, but the basket stayed empty. No request to `/api/BasketItems` appeared in the network trace, and a `waitForResponse` set up after the click timed out.
 
-### 3. Remediation
-4. Pre-seeded `bid` into `sessionStorage` via `addInitScript`.
-2. Bound the action dispatch and network listener concurrently via `Promise.all`:
-```typescript
+**Root cause**
+
+1. Juice Shop's client reads the basket id from `sessionStorage['bid']`. Playwright's `storageState` saves cookies and `localStorage`, but not `sessionStorage`, so the id was missing and the client dropped the add silently.
+2. The click and the response wait were awaited one after the other, so when the click was blocked the wait could never succeed.
+
+**Fix**
+
+1. Seed `bid` into `sessionStorage` with an init script (`authedPage` fixture, `src/fixtures.ts`).
+2. Start waiting for the response in the same step as the click (`src/pages/CatalogPage.ts`):
+
+```ts
 const [response] = await Promise.all([
   this.page.waitForResponse(
-    (resp) => resp.url().includes('/api/BasketItems') && resp.out() < 400,
-    { timeout: 10000 }
+    (res) => res.url().includes('/api/BasketItems') && res.request().method() === 'POST',
   ),
-  addButton.dispatchEvent('click'),
+  addButton.click(),
 ]);
 ```
 
-### 4. SDET Architectural Defense
-Awaiting an action and subsequently awaiting its network response is an anti-pattern that causes race conditions. Asynchronous operations tied to events should always be synchronized concurrently using `Promise.all`.
+**Lesson**
+Register the response listener before (or together with) the action that triggers it.
 
 ---
 
-## [INC-005] Ghost Network Request Await on Frontend SPA Client-Side Route Transition
-* **Status:** Resolved
-* **Severity:** High (Asynchronous Flow / Architecture Misalignment)
-* **Impacted Scope:** `tests/e2e/checkout.spec.ts` (Basket to Checkout transition)
+## INC-004: Waiting for a network call that never happens
 
-### 1. Incident Symptom
-Playwright timed out after 10,000ms attempting to intercept a basket response upon clicking checkout:
-`TimeoutError: page.waitForResponse: Timeout 10000ms exceeded while waiting for event "response"`
-Target route: `/rest/basket/`
+**Affected:** basket -> checkout transition
 
-### 2. Root-Cause Autopsy
-The test implemented a concurrent `Promise.all([page.waitForResponse(...), page.locator('#checkoutButton').click()])` assuming `#checkoutButton` triggered a network fetch to refresh basket state. In OWASP Juice Shop's Angular client, navigating from `/#/basket` to `/#/address/select` is a purely client-side router transition. The basket payload was already cached in client memory. Waiting for a network response that never fired resulted in a deterministic 10-second timeout.
+**Symptom**
 
-### 3. Remediation
-Removed the ghost network interception listener. Replaced with explicit URL routing and DOM state synchronization:
-```typescript
-await page.goto('/#/basket');
-await expect(page).toHaveURL(/.*basket/);
-await expect(page.locator('mat-row').first()).toBeVisible({ timeout: 10000 });
+```
+TimeoutError: page.waitForResponse: Timeout 10000ms exceeded while waiting for event "response"
+```
 
-await page.locator('#checkoutButton').click();
-await expect(page).toHaveURL(/.*address\/select/, { timeout: 10000 });
+**Root cause**
+The test waited for a basket API response when clicking "Checkout". In Juice Shop, `/#/basket` -> `/#/address/select` is a client-side route change and the basket is already in memory, so no request is made.
 
----
+**Fix**
+Assert the observable outcome, the URL change, instead of an assumed request (`src/pages/BasketPage.ts`):
 
-## [INC-006] Windows Named Pipe IPC Failure on Inactive Docker Desktop Daemon
-* **Status:** Resolved
-* **Severity:** Blocker (Local Infrastructure / OS Inter-Process Communication)
-* **Impacted Scope:** Docker CLI execution via Windows PowerShell
+```ts
+await this.checkoutButton.click();
+await expect(this.page).toHaveURL(/address\/select/);
+```
 
-### 1. Incident Symptom
-Docker Compose aborted before executing builds or pulling images:
-`failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine; check if the path is correct and if the daemon is running: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.`
-
-### 2. Root-Cause Autopsy
-On Windows, the Docker CLI communicates with the Docker Engine service over an IPC Windows Named Pipe (`//./pipe/dockerDesktopLinuxEngine`). The Docker Desktop backend daemon (`dockerd` inside the WSL2 distro) was terminated, removing the pipe handle from the Windows kernel namespace.
-
-### 3. Remediation
-Spawned the Docker Desktop host process via PowerShell and added an active polling loop against `docker info` to block execution until the named pipe registered:
-```powershell
-Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"
-while (-not (docker info 2>$null)) { Start-Sleep -Seconds 3 }
-
-# Engineering Post-Mortems & Incident Log (`INCIDENTS.md`)
+**Lesson**
+Check the network tab to confirm a request actually exists before waiting on it.
 
 ---
 
-## [INC-001] Docker Daemon Host Socket Collision on TCP Port 3000
-* **Status:** Resolved
-* **Severity:** Blocker (Infrastructure / Local Container Runtime)
-* **Impacted Scope:** Local container provisioning (`bkimminich/juice-shop`)
+## INC-005: Shared admin session made tests order-dependent
 
-### 1. Incident Symptom
-Docker daemon failed to bind port 3000:
-`listen tcp 0.0.0.0:3000: bind: Only one usage of each socket address is normally permitted.`
+**Affected:** whole suite (original design)
 
-### 2. Root-Cause Autopsy
-An orphaned host Node.js process retained an active listening socket on port 3000, blocking the Docker daemon's network allocation.
+**Symptom**
+The checkout test had to handle "address already exists" and "card already exists" branches, and the catalog test had a conditional "if badge visible, else open basket" path. Both made it unclear what a pass actually proved.
 
-### 3. Remediation
-Extracted the PID via host socket inspection and terminated the process:
-```powershell
-netstat -ano | findstr :3000
-taskkill /PID <PID> /F
-docker run -d --name target-juice-shop -p 3000:3000 bkimminich/juice-shop
+**Root cause**
+All tests shared one admin login and one basket, so state left by one test changed what the next one saw.
+
+**Fix**
+Each test gets its own user, created through the API (`user` and `authedPage` fixtures, `ApiClient.createUser()`). A brand-new user always has an empty basket, no addresses and no cards, so the page objects follow a single path and the conditionals were removed. ESLint (`playwright/no-conditional-in-test`) keeps them out of the specs.
+
+**Lesson**
+Make the starting state deterministic, then the test doesn't need branches.

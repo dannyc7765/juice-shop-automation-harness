@@ -1,7 +1,6 @@
 node_modules
-test-results
 allure-results
 allure-report
+test-results
 reports
-.git
-.github
+package-lock.json

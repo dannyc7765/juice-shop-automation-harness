@@ -1,11 +1,11 @@
 services:
   juice-shop:
-    image: bkimminich/juice-shop:latest
+    image: ${JUICE_SHOP_IMAGE:-bkimminich/juice-shop:latest}
     container_name: juice-shop
     networks:
       - test-net
     expose:
-      - "3000"
+      - '3000'
 
   test-runner:
     build:
@@ -18,19 +18,15 @@ services:
       - BASE_URL=http://juice-shop:3000
       - CI=true
     volumes:
+      # Directories only: bind-mounting a non-existent file makes Docker create a directory in its place.
       - ./allure-results:/app/allure-results
       - ./test-results:/app/test-results
-      - ./flaky-tests.json:/app/flaky-tests.json
-      - ./.auth:/app/.auth
+      - ./reports:/app/reports
     depends_on:
       - juice-shop
     command: >
-      sh -c "node -e '
-        const check = () => fetch(\"http://juice-shop:3000/rest/admin/application-version\")
-          .then(r => { if (!r.ok) throw new Error(); process.exit(0); })
-          .catch(() => setTimeout(check, 1000));
-        check();
-      ' && npx playwright test"
+      sh -c "node scripts/wait-for-app.mjs http://juice-shop:3000/rest/admin/application-version 120
+      && npx playwright test"
 
 networks:
   test-net:
