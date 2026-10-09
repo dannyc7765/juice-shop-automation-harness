@@ -1,6 +1,6 @@
 import { test, expect } from '../../src/fixtures.js';
 
-test('application loads and reports a version', async ({ page, request }) => {
+test('application loads and reports a version', { tag: '@smoke' }, async ({ page, request }) => {
   await page.goto('/');
   await expect(page).toHaveTitle(/OWASP Juice Shop/);
 

@@ -135,3 +135,73 @@ Each test gets its own user, created through the API (`user` and `authedPage` fi
 
 **Lesson**
 Make the starting state deterministic, then the test doesn't need branches.
+
+---
+
+## INC-006: Order summary read before it finished rendering
+
+**Affected:** `CheckoutPage` order summary assertion
+
+**Symptom**
+The "total is at least the item price" check failed twice with different wrong values, first `0` and then `0.99` (expected at least `1.99`). The page snapshot taken after the failure showed the correct summary (Items 1.99, Delivery 0.99, Total 2.98).
+
+**Root cause**
+The summary table renders first and fills in its figures progressively. The first read saw `0.00`. My first fix waited for "any non-zero number", which let the half-loaded state through: the total briefly showed only the delivery fee, `0.99`.
+
+**Fix**
+Wait for the page to be fully consistent instead of for "a number". The test polls until Items equals the price from the API and Total equals Items + Delivery - Promotion, working in whole cents to avoid floating-point error (`CheckoutPage.expectOrderSummary()`):
+
+```ts
+await expect
+  .poll(async () => {
+    const items = await this.readSummaryCents('Items');
+    const delivery = await this.readSummaryCents('Delivery');
+    const promotion = await this.readSummaryCents('Promotion');
+    const total = await this.readSummaryCents('Total Price');
+    return items === Math.round(expectedItemPrice * 100) && total === items + delivery - promotion;
+  })
+  .toBe(true);
+```
+
+**Lesson**
+Asserting that a value is "not the initial value" is weaker than asserting what the value should be. The expected price comes from the API, so the UI is checked against an independent source.
+
+---
+
+## INC-007: Waiting on a specific search response hung the test
+
+**Affected:** `CatalogPage.search()`
+
+**Symptom**
+`page.waitForResponse` timed out after 30s even though the page snapshot showed the search results rendered.
+
+**Root cause**
+The predicate matched on the exact request URL and query string. I never established which part of the real request it failed to match. That is the point: the check was coupled to request details that don't matter to what the test is verifying.
+
+**Fix**
+Assert the outcome the user sees, the rendered results heading, instead of the request that produced it (`src/pages/CatalogPage.ts`):
+
+```ts
+await expect(this.page.getByText(`Search Results - ${term}`)).toBeVisible();
+```
+
+**Lesson**
+Wait on the user-visible result unless the request itself is what's under test. Network waits are brittle (see also INC-004). `addToBasket` still waits on its response, because there the API call is the behaviour being verified.
+
+---
+
+## INC-008: `passwordRepeat` is only validated in the browser
+
+**Affected:** user registration (`POST /api/Users`)
+
+**Symptom**
+A test expecting a 4xx when `password` and `passwordRepeat` differ received `201 Created`.
+
+**Root cause**
+This is a server-side validation gap, not a test bug: the mismatch check only exists in the Angular form.
+
+**Fix**
+Moved the test to `tests/api/security.api.spec.ts`, asserting the secure behaviour (400) and marked with `test.fail()`, like the SQL injection and IDOR checks. It passes while the gap exists and fails when the server starts enforcing the rule, which is the prompt to remove the annotation.
+
+**Lesson**
+When a test fails because the application is wrong, record that as a finding instead of bending the assertion to match the current behaviour.

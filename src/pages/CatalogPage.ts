@@ -30,7 +30,7 @@ export class CatalogPage extends BasePage {
 
   /** Clicks "Add to Basket" and waits for the POST that persists the item. */
   async addToBasket(name: string): Promise<void> {
-    const addButton = this.productCard(name).locator('button[aria-label="Add to Basket"]');
+    const addButton = this.productCard(name).getByRole('button', { name: 'Add to Basket' });
     await expect(addButton).toBeVisible();
 
     const [response] = await Promise.all([

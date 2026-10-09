@@ -29,8 +29,40 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
 
-  test-sharded:
+  smoke:
+    name: Smoke (fast gate)
     needs: static-checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      juice-shop:
+        image: bkimminich/juice-shop:v20.2.0
+        ports:
+          - 3000:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/wait-for-app.mjs http://localhost:3000/rest/admin/application-version 120
+      - name: Run @smoke tests
+        env:
+          BASE_URL: http://localhost:3000
+        run: npm run test:smoke
+      - name: Upload traces and videos
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  test-sharded:
+    needs: [static-checks, smoke]
     timeout-minutes: 20
     runs-on: ubuntu-24.04
     strategy:

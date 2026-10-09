@@ -7,14 +7,14 @@ Playwright + TypeScript UI and API tests for [OWASP Juice Shop](https://github.c
 
 ## What is covered
 
-| Area                  | Type | What it checks                                                                                                                      |
-| --------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Auth                  | API  | register, login, wrong password (401), duplicate email, mismatched passwords, auth-required endpoints                               |
-| Products              | API  | catalog integrity, data-driven search, empty search                                                                                 |
-| Basket                | API  | empty on creation, add item, requires token                                                                                         |
-| Security              | API  | SQLi login bypass and basket IDOR, asserted as secure behaviour and marked `test.fail()` because Juice Shop is vulnerable by design |
-| Login, search, basket | UI   | login success and failure, search, add to basket                                                                                    |
-| Checkout              | UI   | full purchase: address, delivery, card, order confirmation                                                                          |
+| Area                  | Type | What it checks                                                                                                                                                               |
+| --------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth                  | API  | register, login, wrong password (401), duplicate email, auth-required endpoints                                                                                              |
+| Products              | API  | catalog integrity, data-driven search, empty search                                                                                                                          |
+| Basket                | API  | empty on creation, add item, requires token                                                                                                                                  |
+| Security              | API  | SQLi login bypass, basket IDOR and server-side `passwordRepeat` validation, asserted as secure behaviour and marked `test.fail()` because Juice Shop is vulnerable by design |
+| Login, search, basket | UI   | login success and failure, search, add to basket                                                                                                                             |
+| Checkout              | UI   | full purchase: address, delivery, card, order confirmation                                                                                                                   |
 
 ## Design decisions
 
@@ -22,6 +22,8 @@ Playwright + TypeScript UI and API tests for [OWASP Juice Shop](https://github.c
 - **Page objects** in `src/pages`, API setup in `src/api/ApiClient.ts`.
 - **Lint rules enforce the lessons in [INCIDENTS.md](INCIDENTS.md)**: no `force: true`, no `waitForTimeout`, no conditionals inside tests.
 - **Retries are CI-only** (1). Anything that fails and then passes is written to `reports/flaky-tests.json` and the CI job summary. It is reported, not hidden.
+- **`@smoke` tag**: four fast tests (app loads, login via UI, login via API, catalog integrity) run first in CI as a gate. The full suite only starts if they pass.
+- **Playwright is pinned to an exact version** (`package.json` and the Docker base image must match, or the container's browsers won't).
 - **Allure history** is preserved on the `gh-pages` branch to show trends across runs.
 
 ## Run it
@@ -30,7 +32,7 @@ Requires Node 24+.
 
 ### Locally
 
-Start Juice Shop (`docker run -d -p 3000:3000 bkimminich/juice-shop`), then:
+Start Juice Shop (`docker run -d -p 3000:3000 bkimminich/juice-shop:v20.2.0`), then:
 
 ```bash
 npm ci
@@ -38,6 +40,7 @@ npx playwright install --with-deps chromium
 npm test            # everything
 npm run test:api    # API only
 npm run test:ui     # UI only
+npm run test:smoke  # the @smoke subset (4 tests, about 10 seconds)
 ```
 
 ### In Docker (Juice Shop + tests on an isolated network)
@@ -54,7 +57,7 @@ npm run typecheck && npm run lint && npm run format:check
 
 ## CI
 
-`.github/workflows/e2e.yml`: lint and typecheck, then tests in 2 shards against a Juice Shop service container, then the Allure report is merged and published to GitHub Pages from `main`.
+`.github/workflows/e2e.yml`: lint and typecheck, then the `@smoke` gate, then the full suite in 2 shards against a Juice Shop service container, then the Allure report is merged and published to GitHub Pages from `main`.
 
 ## Troubleshooting (Windows + Docker Desktop)
 

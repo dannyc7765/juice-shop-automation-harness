@@ -2,7 +2,7 @@ import { test, expect } from '../../src/fixtures.js';
 import { LoginPage } from '../../src/pages/LoginPage.js';
 
 test.describe('Login (UI)', () => {
-  test('registered user can log in', async ({ page, api }) => {
+  test('registered user can log in', { tag: '@smoke' }, async ({ page, api }) => {
     const creds = await api.register();
     const login = new LoginPage(page);
 
