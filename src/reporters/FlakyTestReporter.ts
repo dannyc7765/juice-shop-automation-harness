@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { stripVTControlCharacters } from 'node:util';
 import type { Reporter, TestCase, TestResult } from '@playwright/test/reporter';
 
 export interface FlakyRecord {
@@ -28,7 +29,12 @@ export default class FlakyTestReporter implements Reporter {
   onTestEnd(test: TestCase, result: TestResult): void {
     if (result.status !== 'passed' || result.retry === 0) return;
 
-    const firstFailure = test.results.find((r) => r.status === 'failed' || r.status === 'timedOut');
+    const failedAttempt = test.results.find(
+      (r) => r.status === 'failed' || r.status === 'timedOut',
+    );
+    // Playwright colours its error messages; strip the terminal codes so the JSON stays readable.
+    const message = stripVTControlCharacters(failedAttempt?.error?.message ?? 'unknown');
+
     this.records.push({
       testId: test.id,
       title: test.title,
@@ -37,7 +43,7 @@ export default class FlakyTestReporter implements Reporter {
       attemptsToPass: result.retry + 1,
       durationMs: result.duration,
       timestamp: new Date().toISOString(),
-      firstFailure: firstFailure?.error?.message?.split('\n')[0] ?? 'unknown',
+      firstFailure: message.split('\n')[0],
     });
   }
 

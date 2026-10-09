@@ -7,9 +7,7 @@ interface Product {
 }
 
 test.describe('Products API', () => {
-  test('catalog is non-empty and every product has a name and positive price', async ({
-    request,
-  }) => {
+  test('catalog has valid names and prices', { tag: '@smoke' }, async ({ request }) => {
     const res = await request.get('/api/Products');
     expect(res.ok()).toBeTruthy();
     const { data } = (await res.json()) as { data: Product[] };

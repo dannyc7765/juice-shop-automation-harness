@@ -1,7 +1,7 @@
 import { test, expect } from '../../src/fixtures.js';
 
 test.describe('Auth API', () => {
-  test('valid credentials return a token and a basket id', async ({ api }) => {
+  test('valid credentials return a token and a basket id', { tag: '@smoke' }, async ({ api }) => {
     const creds = await api.register();
     const session = await api.login(creds);
     expect(session.token.split('.')).toHaveLength(3); // JWT

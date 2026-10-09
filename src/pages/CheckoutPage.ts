@@ -33,7 +33,7 @@ export class CheckoutPage extends BasePage {
     this.nextButton = page.locator('button.btn-next, button[aria-label*="Proceed"]').first();
     this.firstRadio = page.locator('mat-row mat-radio-button').first();
     this.submitButton = page.locator('#submitButton');
-    this.placeOrderButton = page.locator('#checkoutButton');
+    this.placeOrderButton = page.getByRole('button', { name: 'Complete your purchase' });
   }
 
   private async selectFirstRadioAndContinue(): Promise<void> {
