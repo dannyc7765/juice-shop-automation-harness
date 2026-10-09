@@ -1,1 +1,1 @@
-[{"values":["Playwright 1.63.0"],"name":"Framework"},{"values":["v24"],"name":"Node.js"},{"values":["OWASP Juice Shop"],"name":"Target.Application"},{"values":["2 Shards"],"name":"Execution.Matrix"},{"values":["Automated Retry SLA Isolation"],"name":"Quarantine.Policy"}]
+[{"values":["Playwright 1.64.0"],"name":"Framework"},{"values":["v24.21.0"],"name":"Node.js"},{"values":["OWASP Juice Shop"],"name":"Target.Application"},{"values":["2"],"name":"Shards"}]
