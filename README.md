@@ -4,7 +4,8 @@
 [![Allure Report](https://img.shields.io/badge/Allure_Report-View_Live-brightgreen)](https://dannyc7765.github.io/juice-shop-automation-harness/)
 
 Production-grade Playwright orchestration suite featuring API token injection, overlay bypass automation, sharded parallel CI execution, and quarantined telemetry collection.
-
+### 🛡️ Engineering Post-Mortems & Incident Log
+Detailed root-cause autopsies documenting distributed CI race conditions, overlay deadlocks, and container networking triage are tracked in [`INCIDENTS.md`](./INCIDENTS.md).
 ## Execution Runbooks
 
 ### 1. Local Headless Execution
