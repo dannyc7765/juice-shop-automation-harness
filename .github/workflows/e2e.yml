@@ -37,6 +37,9 @@ jobs:
     services:
       juice-shop:
         image: bkimminich/juice-shop:v20.2.0
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
         ports:
           - 3000:3000
     steps:
@@ -74,6 +77,9 @@ jobs:
       juice-shop:
         # Pinned to the version the suite was validated against. Bump deliberately, not implicitly.
         image: bkimminich/juice-shop:v20.2.0
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
         ports:
           - 3000:3000
 
