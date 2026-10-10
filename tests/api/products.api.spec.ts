@@ -18,6 +18,24 @@ test.describe('Products API', () => {
     }
   });
 
+  test('every product matches the expected schema', async ({ request }) => {
+    const res = await request.get('/api/Products');
+    const { status, data } = await res.json();
+    expect(status).toBe('success');
+    expect(data.length).toBeGreaterThan(0);
+    for (const product of data) {
+      expect(product).toEqual(
+        expect.objectContaining({
+          id: expect.any(Number),
+          name: expect.any(String),
+          description: expect.any(String),
+          price: expect.any(Number),
+          image: expect.any(String),
+        }),
+      );
+    }
+  });
+
   for (const term of ['apple', 'banana', 'lemon']) {
     test(`search for "${term}" only returns matching products`, async ({ request }) => {
       const res = await request.get('/rest/products/search', { params: { q: term } });

@@ -205,3 +205,21 @@ Moved the test to `tests/api/security.api.spec.ts`, asserting the secure behavio
 
 **Lesson**
 When a test fails because the application is wrong, record that as a finding instead of bending the assertion to match the current behaviour.
+
+---
+
+## INC-009: Duplicate basket item returns 500, not 4xx
+
+**Affected:** `POST /api/BasketItems`
+
+**Symptom**
+A test expecting HTTP 400 when the same product is added to a basket twice received `500`.
+
+**Root cause**
+The server rejects the duplicate (a uniqueness constraint) but surfaces the database error as an internal server error instead of a client error.
+
+**Fix**
+The behavioural test now asserts what matters: the second add is rejected and the basket still holds one line with quantity 1. A separate `test.fail()` test records the defect (status should be below 500), so it turns red if the server is fixed.
+
+**Lesson**
+A guess about an API's error code is a hypothesis. When the server disagrees, assert the behaviour you can rely on and record the defect separately.
