@@ -19,8 +19,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
@@ -43,8 +43,8 @@ jobs:
         ports:
           - 3000:3000
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
@@ -57,7 +57,7 @@ jobs:
         run: npm run test:smoke
       - name: Upload traces and videos
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: smoke-test-results
           path: test-results/
@@ -84,9 +84,9 @@ jobs:
           - 3000:3000
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
@@ -116,7 +116,7 @@ jobs:
 
       - name: Upload traces, videos and flaky report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-results-shard-${{ matrix.shardIndex }}
           path: |
@@ -127,7 +127,7 @@ jobs:
 
       - name: Upload raw Allure results
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: allure-results-shard-${{ matrix.shardIndex }}
           path: allure-results/
@@ -142,22 +142,22 @@ jobs:
     permissions:
       contents: write # needed only to push the gh-pages branch
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
 
       - run: npm install -g allure-commandline
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: allure-results-shard-*
           path: consolidated-allure-results
           merge-multiple: true
 
       - name: Checkout gh-pages for history
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         continue-on-error: true
         with:
           ref: gh-pages
