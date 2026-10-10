@@ -62,7 +62,7 @@ npm run typecheck && npm run lint && npm run format:check
 
 ## CI
 
-`.github/workflows/e2e.yml`: lint and typecheck, then the `@smoke` gate, then the full suite in 2 shards against a Juice Shop service container, then the Allure report is merged and published to GitHub Pages from `main`.
+`.github/workflows/e2e.yml`: lint and typecheck, then the `@smoke` gate, then the full suite in 2 shards against a Juice Shop service container, then the Allure report is merged and published to GitHub Pages from `main`. The workflow needs two repository secrets, `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (a read-only Docker Hub access token), so the Juice Shop image can be pulled without hitting Docker Hub's anonymous rate limit.
 
 ## Troubleshooting (Windows + Docker Desktop)
 
@@ -73,3 +73,4 @@ npm run typecheck && npm run lint && npm run format:check
 
 - Single browser (Chromium).
 - Validated against Juice Shop v20.2.0 (pinned in CI and compose). Newer versions may need locator updates.
+- Pull requests from forks don't receive repository secrets, so the service container pull is unauthenticated there and can fail with a rate-limit error.

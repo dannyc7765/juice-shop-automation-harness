@@ -223,3 +223,34 @@ The behavioural test now asserts what matters: the second add is rejected and th
 
 **Lesson**
 A guess about an API's error code is a hypothesis. When the server disagrees, assert the behaviour you can rely on and record the defect separately.
+
+---
+
+## INC-010: CI failed pulling the Juice Shop image (Docker Hub rate limit)
+
+**Affected:** every job that starts the `juice-shop` service container (`smoke` and both `test-sharded` shards)
+
+**Symptom**
+The first CI run on a pull request failed at "Initialize containers", before any test code ran. The log showed the image pull timing out against Docker Hub's auth server (`Client.Timeout exceeded while awaiting headers`). That looked like a transient registry outage, so I re-ran the failed jobs. The re-run failed again, this time with a clearer message:
+
+```
+Error response from daemon: toomanyrequests: You have reached your unauthenticated pull rate limit.
+```
+
+**Root cause**
+GitHub-hosted runners share outbound IP addresses, and Docker Hub rate-limits anonymous pulls per address. Adding the `@smoke` gate had raised the number of pulls per workflow run from two to three (the smoke job plus both shards), which made hitting the limit more likely. The earlier timeout was the same problem showing up as a slow auth response.
+
+**Fix**
+Authenticate the pull. A Docker Hub access token with read-only access to public repositories is stored as two repository secrets (`DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`) and passed to both service definitions in `.github/workflows/e2e.yml`:
+
+```yaml
+services:
+  juice-shop:
+    image: bkimminich/juice-shop:v20.2.0
+    credentials:
+      username: ${{ secrets.DOCKERHUB_USERNAME }}
+      password: ${{ secrets.DOCKERHUB_TOKEN }}
+```
+
+**Lesson**
+Retrying is a diagnostic as well as a fix. When the second attempt failed with a different message, that message named the cause. Read the whole log before assuming a failure is transient, and count how many times a change makes the pipeline hit an external dependency.
