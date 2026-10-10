@@ -5,6 +5,8 @@
 
 Playwright + TypeScript UI and API tests for [OWASP Juice Shop](https://github.com/juice-shop/juice-shop), run in GitHub Actions with sharding, Allure reporting and a flaky-test report.
 
+![Allure report overview showing the passing test run and trend history](docs/allure-report.png)
+
 ## What is covered
 
 | Area     | Type | What it checks                                                                                                                                                               |
@@ -74,3 +76,7 @@ npm run typecheck && npm run lint && npm run format:check
 - Single browser (Chromium).
 - Validated against Juice Shop v20.2.0 (pinned in CI and compose). Newer versions may need locator updates.
 - Pull requests from forks don't receive repository secrets, so the service container pull is unauthenticated there and can fail with a rate-limit error.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
