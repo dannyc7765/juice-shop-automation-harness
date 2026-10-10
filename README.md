@@ -7,15 +7,18 @@ Playwright + TypeScript UI and API tests for [OWASP Juice Shop](https://github.c
 
 ## What is covered
 
-| Area                  | Type | What it checks                                                                                                                                                               |
-| --------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Auth                  | API  | register, login, wrong password (401), duplicate email, auth-required endpoints                                                                                              |
-| Products              | API  | catalog integrity, data-driven search, empty search, product schema                                                                                                          |
-| Basket                | API  | empty on creation, add, update quantity, remove, schema, duplicate add rejected, requires token                                                                              |
-| Orders                | API  | checkout via API, order history, basket emptied after checkout                                                                                                               |
-| Security              | API  | SQLi login bypass, basket IDOR and server-side `passwordRepeat` validation, asserted as secure behaviour and marked `test.fail()` because Juice Shop is vulnerable by design | The duplicate-basket-item 500 is documented the same way. |
-| Login, search, basket | UI   | login success and failure, search, add to basket                                                                                                                             |
-| Checkout              | UI   | full purchase: address, delivery, card, order confirmation                                                                                                                   |
+| Area     | Type | What it checks                                                                                                                                                               |
+| -------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth     | API  | register, login, wrong password (401), duplicate email, auth-required endpoints                                                                                              |
+| Products | API  | catalog integrity, data-driven search, empty search, product schema                                                                                                          |
+| Basket   | API  | empty on creation, add, update quantity, remove, schema, duplicate add rejected, requires token                                                                              |
+| Orders   | API  | checkout via API, order history, basket emptied after checkout                                                                                                               |
+| Security | API  | SQLi login bypass, basket IDOR and server-side `passwordRepeat` validation, asserted as secure behaviour and marked `test.fail()` because Juice Shop is vulnerable by design | The duplicate-basket-item 500 is documented the same way. |
+
+| Security | UI | DOM XSS via the search query, asserted as secure behaviour and marked `test.fail()` |
+
+| Login, search, basket | UI | login success and failure, search, add to basket |
+| Checkout | UI | full purchase: address, delivery, card, order confirmation |
 
 ## Design decisions
 
