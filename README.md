@@ -18,7 +18,8 @@ Playwright + TypeScript UI and API tests for [OWASP Juice Shop](https://github.c
 | Security | UI | DOM XSS via the search query, asserted as secure behaviour and marked `test.fail()` |
 
 | Login, search, basket | UI | login success and failure, search, add to basket |
-| Checkout | UI | full purchase: address, delivery, card, order confirmation |
+
+| Checkout | UI | full purchase: address, delivery, card, order confirmation; payment form validation (invalid card number, submit gating, continue gated on payment method) |
 
 ## Design decisions
 
